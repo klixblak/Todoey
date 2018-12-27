@@ -9,15 +9,21 @@
 import UIKit
 import CoreData
 
-class TodoListViewController: UITableViewController, UISearchBarDelegate
+class TodoListViewController: UITableViewController
 {
     var itemArray = [Item]()
+    var selectedCategory : Category? {
+        didSet {
+            LoadItems()
+        }
+    }
+    
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad()
     {
         super.viewDidLoad()
-        LoadItems()
+        //LoadItems()
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -57,6 +63,7 @@ class TodoListViewController: UITableViewController, UISearchBarDelegate
             let newItem = Item(context: self.context)
             newItem.title = myNewItem.text!
             newItem.done = false
+            newItem.parentCategory = self.selectedCategory
             self.itemArray.append(newItem)
 
             self.SaveItems()
@@ -85,25 +92,20 @@ class TodoListViewController: UITableViewController, UISearchBarDelegate
         }
         
         self.tableView.reloadData()
-        
-/*        let encoder = PropertyListEncoder()
-        
-        do
-        {
-            let data = try encoder.encode(itemArray)
-            try data.write(to: dataFilePath!)
-        }
-        catch
-        {
-            print("Error encoding item array, \(error)")
-        }
-*/
     }
     
-    func LoadItems()
+    func LoadItems(with request: NSFetchRequest<Item> = Item.fetchRequest())//, predicate: NSPredicate? = nil)
     {
+        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
         
-        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        if let additionalPredicate = request.predicate {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, additionalPredicate])
+        }
+        else
+        {
+            request.predicate = categoryPredicate
+        }
+        
         do
         {
             itemArray = try context.fetch(request)
@@ -112,26 +114,44 @@ class TodoListViewController: UITableViewController, UISearchBarDelegate
         {
             print ("Error fetching data \(error)")
         }
-        
-        /*
-        if let data = try? Data(contentsOf: dataFilePath!)
-        {
-            let decoder = PropertyListDecoder()
-            do
-            {
-                itemArray = try decoder.decode([Item].self, from: data)
-            }
-            catch
-            {
-                print("error \(error)")
-            }
-        }
-         */
+        tableView.reloadData()
     }
     
+}
+
+// MARK - Extension functions for the search bar
+extension TodoListViewController: UISearchBarDelegate
+{
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar)
     {
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        // it is worth downloading the predicate cheat sheet from academy.realm.io
+        // note the [cd] says ignore case and weird characters above letters e.g. German umlout.
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        LoadItems(with: request)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String)
+    {
+        if searchBar.text?.count == 0
+        {
+            LoadItems()
+            
+            DispatchQueue.main.async
+            {
+                searchBar.resignFirstResponder()
+            }
+        }
         
     }
+    
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar)
+    {
+        LoadItems()
+    }
+    
+
 }
 
