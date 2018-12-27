@@ -7,12 +7,12 @@
 //
 
 import UIKit
+import CoreData
 
-class TodoListViewController: UITableViewController
+class TodoListViewController: UITableViewController, UISearchBarDelegate
 {
     var itemArray = [Item]()
-    let defaults = UserDefaults.standard
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad()
     {
@@ -29,21 +29,21 @@ class TodoListViewController: UITableViewController
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
         
         let item = itemArray[indexPath.row]
-        cell.textLabel?.text = item.Title
+        cell.textLabel?.text = item.title
 
         // Ternary operator ==>
         //
         // value = condition ? valueIfTrue : valueIfFalse
-        cell.accessoryType = item.Done ? .checkmark : .none
+        cell.accessoryType = item.done ? .checkmark : .none
         
         return cell
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath)
     {
-        itemArray[indexPath.row].Done = !itemArray[indexPath.row].Done
+        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         SaveItems()
-        tableView.reloadData()
+
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -54,14 +54,13 @@ class TodoListViewController: UITableViewController
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
 
-                let newItem = Item()
-                newItem.Title = myNewItem.text!
-                self.itemArray.append(newItem)
+            let newItem = Item(context: self.context)
+            newItem.title = myNewItem.text!
+            newItem.done = false
+            self.itemArray.append(newItem)
 
-                // we would like to make this persistant
-
-                self.SaveItems()
-                self.tableView.reloadData()
+            self.SaveItems()
+            
         }
         
         alert.addTextField { (alertTextField) in
@@ -75,7 +74,19 @@ class TodoListViewController: UITableViewController
     
     func SaveItems()
     {
-        let encoder = PropertyListEncoder()
+        
+        do
+        {
+            try context.save()
+        }
+        catch
+        {
+            print("Error encoding item array, \(error)")
+        }
+        
+        self.tableView.reloadData()
+        
+/*        let encoder = PropertyListEncoder()
         
         do
         {
@@ -86,11 +97,23 @@ class TodoListViewController: UITableViewController
         {
             print("Error encoding item array, \(error)")
         }
-
+*/
     }
     
     func LoadItems()
     {
+        
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        do
+        {
+            itemArray = try context.fetch(request)
+        }
+        catch
+        {
+            print ("Error fetching data \(error)")
+        }
+        
+        /*
         if let data = try? Data(contentsOf: dataFilePath!)
         {
             let decoder = PropertyListDecoder()
@@ -103,6 +126,12 @@ class TodoListViewController: UITableViewController
                 print("error \(error)")
             }
         }
+         */
+    }
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar)
+    {
+        
     }
 }
 
