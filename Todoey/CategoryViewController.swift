@@ -7,12 +7,13 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController
 {
-    var categoryArray = [Category]()
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
+    
+    var categories: Results<Category>?
 
     override func viewDidLoad()
     {
@@ -20,49 +21,64 @@ class CategoryViewController: UITableViewController
         LoadCategories()
     }
     
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categoryArray.count
+    //basically this forces our table to always have at least 1 row.
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int
+    {
+        if let count = categories?.count
+        {
+            if count == 0
+            {
+                return 1
+            }
+            
+            return count
+        }
+        // Nil coalescing Operator -> i.e. if the category array is empty (or nil) return 1
+        return 1
+        
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell
     {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoCategoryCell", for: indexPath)
         
-        let item = categoryArray[indexPath.row]
-        cell.textLabel?.text = item.name
-        
+        if let count = categories?.count
+        {
+            if count == 0
+            {
+                cell.textLabel?.text = "No Categories Entered"
+            }
+            else
+            {
+                cell.textLabel?.text = categories?[indexPath.row].name ?? "No Categories Entered"
+            }
+        }
+
         return cell
     }
     
-    func SaveCategories()
+    func SaveCategories(category: Category)
     {
-        
         do
         {
-            try context.save()
+            try realm.write {
+                realm.add(category)
+            }
         }
         catch
         {
             print("Error encoding item array, \(error)")
         }
+
         
         self.tableView.reloadData()
     }
 
-    func LoadCategories(with request: NSFetchRequest<Category> = Category.fetchRequest())
+    func LoadCategories()
     {
-        do
-        {
-            categoryArray = try context.fetch(request)
-        }
-        catch
-        {
-            print ("Error fetching data \(error)")
-        }
+        categories = realm.objects(Category.self)
         tableView.reloadData()
     }
-
-
 
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem)
     {
@@ -70,13 +86,10 @@ class CategoryViewController: UITableViewController
         
         let alert = UIAlertController(title: "Add New Todoey Category", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Category", style: .default) { (action) in
-            
-            let newCategory = Category(context: self.context)
+
+            let newCategory = Category()
             newCategory.name = myNewCategory.text!
-            self.categoryArray.append(newCategory)
-            
-            self.SaveCategories()
-            
+            self.SaveCategories(category: newCategory)
         }
         
         alert.addTextField { (alertTextField) in
@@ -101,7 +114,7 @@ class CategoryViewController: UITableViewController
         let destinationVC = segue.destination as! TodoListViewController
         if let indexPath = tableView.indexPathForSelectedRow
         {
-            destinationVC.selectedCategory = categoryArray[indexPath.row]
+            destinationVC.selectedCategory = categories?[indexPath.row]
         }
     }
 }
